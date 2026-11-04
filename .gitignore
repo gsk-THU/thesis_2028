@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 虚拟环境
+.venv/
+venv/
+
+# 模型权重（体积大，见 README 的下载说明）
+models/
+*.pth
+*.pt
+
+# 数据集（FID-300 仅限研究用途，禁止再分发；其余数据集请自行获取）
+data/
+*.zip
+
+# 第三方仓库（README 有克隆说明）
+third_party/
+
+# 运行输出
+outputs/
+outputs_*/
+*.npz
+
+# 系统/编辑器
+.DS_Store
+.idea/
+.vscode/
