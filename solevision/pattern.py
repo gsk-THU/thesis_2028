@@ -15,7 +15,10 @@ from .schema import TreadElement
 def extract_elements(blocks: np.ndarray, height_mm: np.ndarray, pixel_mm: float,
                      min_area_mm2: float = 3.0,
                      restrict_mask: Optional[np.ndarray] = None) -> List[TreadElement]:
-    min_area_px = max(int(min_area_mm2 / max(pixel_mm, 1e-6) ** 2), 8)
+    if pixel_mm == pixel_mm:  # 已标定（mm/px）
+        min_area_px = max(int(min_area_mm2 / max(pixel_mm, 1e-6) ** 2), 8)
+    else:                     # 未标定：退化为像素面积阈值，mm 字段将为 NaN（序列化时剔除）
+        min_area_px = 40
     src = blocks if restrict_mask is None else (blocks & restrict_mask).astype(np.uint8)
     # 轻微腐蚀断开花纹块间的细连接（如边缘包边），避免整底连成单元素
     eroded = cv2.erode(src, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)), iterations=1)
@@ -83,15 +86,18 @@ def _fft2_peaks(blocks: np.ndarray, pixel_mm: float,
     h, w = m.shape
     if m.sum() < 200:
         return []
-    sigma = max((period_hi_mm / max(pixel_mm, 1e-6)) / 2.0, 4.0)
+    if pixel_mm == pixel_mm:  # 已标定：按 mm 带宽换算
+        sigma = max((period_hi_mm / max(pixel_mm, 1e-6)) / 2.0, 4.0)
+        f_lo = 1.0 / (period_hi_mm / pixel_mm)
+        f_hi = 1.0 / (period_lo_mm / pixel_mm)
+    else:                     # 未标定：纯像素域默认（周期 8~60 px）
+        sigma, f_lo, f_hi = 20.0, 1.0 / 60.0, 1.0 / 8.0
     z = m - cv2.GaussianBlur(m, (0, 0), sigma)
     z = z * np.hanning(h).astype(np.float32)[:, None] * np.hanning(w).astype(np.float32)[None, :]
     F = np.fft.fftshift(np.abs(np.fft.fft2(z)) ** 2)
     fy = np.fft.fftshift(np.fft.fftfreq(h))[:, None]
     fx = np.fft.fftshift(np.fft.fftfreq(w))[None, :]
     freq = np.sqrt(fy ** 2 + fx ** 2)
-    f_lo = 1.0 / (period_hi_mm / pixel_mm)
-    f_hi = 1.0 / (period_lo_mm / pixel_mm)
     band = (freq >= f_lo) & (freq <= f_hi)
     if not band.any():
         return []
